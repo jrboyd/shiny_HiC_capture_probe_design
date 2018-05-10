@@ -6,7 +6,7 @@
 #
 #    http://shiny.rstudio.com/
 #
-DEV=FALSE
+DEV=!basename(dirname(getwd())) == "ShinyApps"
 library(shiny)
 library(shinycssloaders)
 library(BiocFileCache)
@@ -39,10 +39,11 @@ ui <- fluidPage(
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
-            selectInput("selectGenome", "Genome", choices = "hg38"),
-            tags$hr(),
-            selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII"), selected = "HindIII"),
-            withSpinner(plotOutput("plotFragSize")),
+            fluidRow(
+                column(selectInput("selectGenome", "Genome", choices = "hg38"), width = 6),
+                column(selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII"), selected = "HindIII"), width = 6)
+            ),
+            withSpinner(plotOutput("plotFragSize", width = "320px", height = "200px")),
             tags$hr(),
             h5("TSS Extension"),
             fluidRow(
