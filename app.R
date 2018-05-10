@@ -6,7 +6,7 @@
 #
 #    http://shiny.rstudio.com/
 #
-DEV=TRUE
+DEV=FALSE
 library(shiny)
 library(shinycssloaders)
 library(BiocFileCache)
