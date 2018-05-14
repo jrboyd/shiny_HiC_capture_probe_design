@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 .cache
+.cache_enzyme
+.cache_ref
