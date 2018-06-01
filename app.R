@@ -374,8 +374,8 @@ server <- function(input, output, session) {
         nr_total_str = round(nr_total / 10^6, digits = 2)
         tags$p(
             fluidRow(
-                column(width = 4,
-                       tags$h3("Maximum Size"),
+                column(width = 3,
+                       tags$h3("Probes: Maximum Size"),
                        tags$hr(),
                        tags$span(paste("Possible Total:", total_str, "Mb"), style="font-weight:bold"),
                        tags$br(),
@@ -393,10 +393,10 @@ server <- function(input, output, session) {
                        tags$br()
                        
                 ),
-                column(width = 4,
-                       tags$h3("Estimated Size"),
+                column(width = 3,
+                       tags$h3("Probes: Estimated Size"),
                        tags$hr(),
-                       tags$span(paste("non-redundant Total:", nr_total_str, "Mb"), style="font-weight:bold"),
+                       tags$span(paste("Non-Redundant Total:", nr_total_str, "Mb"), style="font-weight:bold"),
                        tags$br(),
                        tags$span(paste("non-redundant Fragments:", nr_enz)),
                        tags$br(),
@@ -405,7 +405,19 @@ server <- function(input, output, session) {
                        tags$span("Probe Size: 120 bp"),
                        tags$br()
                        
+                ),
+                column(width = 3,
+                       tags$h3("Regions: Actual Size"),
+                       tags$hr(),
+                       tags$span(paste("Fragment Size Total:", round(sum(width(rvEnzSelected()))/10^6, 1), "Mb"), style="font-weight:bold"),
+                       tags$br(),
+                       tags$span(paste("non-redundant Fragments:", nr_enz)),
+                       tags$br(),#need average fragment size
+                       tags$span(paste("average fragment size:", paste(round(mean(width(rvEnzSelected()))), "bp"))),
+                       tags$br()
+                       
                 )
+                
             )
             
         )
