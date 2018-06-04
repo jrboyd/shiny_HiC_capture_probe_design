@@ -7,7 +7,7 @@ ucsc_probe_tracks = function(enzyme,
                              promoters_filtered,
                              promoters_missed,
                              out_dir = "/slipstream/galaxy/production/galaxy-dist/static/UCSCtracks/joeboyd_files/probe_app/",
-                             cfg_f = paste0(out_dir, uid, "_track_config_probe_design.txt"),
+                             cfg_f = paste0(out_dir, "track_config_probe_design.txt"),
                              uid = round(runif(1)*10^6)
 ){
     file.remove(dir(out_dir, full.names = TRUE))
