@@ -14,8 +14,8 @@ ucsc_probe_tracks = function(enzyme,
     writeTrack = function(gr, desc, bedf, bbf = sub("\\.bed$", "\\.bb", bedf), color = "black"){
         colrgb = paste(col2rgb(color)[,1], collapse = ",")
         rtracklayer::export.bed(gr, bedf)
-        system(paste("bedSort", bedf, paste0(bedf, ".sorted")))
-        system(paste("bedToBigBed", paste0(bedf, ".sorted"), "~/hg38_chrsizes.txt", bbf))
+        system(paste("bedSort", bedf, paste0(bedf, ".sorted")), intern = TRUE)
+        system(paste("bedToBigBed", paste0(bedf, ".sorted"), "~/hg38_chrsizes.txt", bbf), intern = TRUE)
         makeTrack(file = bbf, type = "bigBed", name = desc, description = desc, color = colrgb)
     }
     
