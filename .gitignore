@@ -5,3 +5,6 @@
 .cache
 .cache_enzyme
 .cache_ref
+*.bed
+*.save
+tmp.txt

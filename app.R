@@ -13,6 +13,7 @@ library(BiocFileCache)
 library(GenomicRanges)
 library(data.table)
 library(ggplot2)
+library(cowplot)
 source("functions_app.R")
 ref_urls = list("hg38" = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_28/gencode.v28.annotation.gtf.gz")
 ref_files = list()
@@ -86,8 +87,8 @@ ui <- fluidPage(
                         value = 200),
             sliderInput("sliderMaxFragSize", 
                         "Maximum Fragment Sizes", 
-                        min = 5000, max = 50000, 
-                        step = 1000, 
+                        min = 5000, max = 200000, 
+                        step = 5000, 
                         value = 10000),
             sliderInput("sliderCGrange",
                         "CG content",
@@ -137,12 +138,15 @@ server <- function(input, output, session) {
     rvAnnotFiltering = reactiveVal()
     rvAnnotLock = reactiveVal()
     rvAnnotExt = reactiveVal()
+    rvAnnotMissed = reactiveVal()
     # rvAnnotFinal = reactiveVal()
     
     rvEnzRaw = reactiveVal()
     rvEnzFiltering = reactiveVal()
     rvEnzLock = reactiveVal()
     rvEnzSelected = reactiveVal()
+    
+    rvOlapDt = reactiveVal()
     
     observeEvent(
         eventExpr = {
@@ -294,6 +298,7 @@ server <- function(input, output, session) {
             rvAnnotLock()
             input$numericTSSdownstream
             input$numericTSSupstream
+            input$numericMaxSearch
         }, 
         handlerExpr = {
             if(is.null(rvAnnotLock())){
@@ -303,11 +308,31 @@ server <- function(input, output, session) {
                 gr = promoters(gr, 
                                upstream = input$numericTSSupstream, 
                                downstream = input$numericTSSdownstream)
-                
+                start(gr) = start(gr) - input$numericMaxSearch
+                end(gr) = end(gr) + input$numericMaxSearch
                 rvAnnotExt(gr)
             }
         }
     )
+    
+    rvConfigFile = reactiveVal()
+    
+    observe({
+        req(input$selectCutter)
+        req(rvEnzSelected())
+        req(rvAnnotMissed())
+        cfg_f = ucsc_probe_tracks(
+            enzyme = input$selectCutter, 
+            enz_full = rvEnzRaw(), 
+            enz_filtered = rvEnzFiltering(), 
+            enz_selected = rvEnzSelected(), 
+            annotation_full = rvAnnotRaw(), 
+            annotation_filtered = rvAnnotFiltering(), 
+            promoters_filtered = rvAnnotExt(),
+            promoters_missed = rvAnnotMissed()
+        )
+        rvConfigFile(cfg_f)
+    })
     
     output$lockStatus = renderUI(
         if(is.null(rvEnzLock()) || is.null(rvAnnotLock())){
@@ -324,21 +349,30 @@ server <- function(input, output, session) {
                     sidebarPanel(
                         h5("TSS Extension"),
                         fluidRow(
-                            column(numericInput("numericTSSdownstream", "Downstream", value = 5000, min = 0, max = 100000, step = 500), width = 6),
-                            column(numericInput("numericTSSupstream", "Upstream", value = 5000, min = 0, max = 100000, step = 500), width = 6)
+                            column(numericInput("numericTSSdownstream", "Downstream", value = 500, min = 0, max = 100000, step = 500), width = 6),
+                            column(numericInput("numericTSSupstream", "Upstream", value = 500, min = 0, max = 100000, step = 500), width = 6)
                         ),
-                        numericInput("numericMaxSearch", "Max Search Extension", value = 10000, min = 0, max = 100000, step = 500),
+                        numericInput("numericMaxSearch", "Max Search Extension", value = 0, min = 0, max = 100000, step = 500),
                         hr(),
                         h5("Design Parameter"),
                         sliderInput("sliderPerTSS", "Fragments per TSS", value = 1, min = 1, max = 20, step = 1),
                         sliderInput("sliderPerFragment", "Probes per fragment", value = 2, min = 1, max = 10, step = 1)
                     ), mainPanel(
-                        withSpinner(plotOutput("plotTSShits", width = "320px", height = "200px"))
+                        fluidRow(
+                            column(width = 3,
+                                   withSpinner(plotOutput("plotTSShits", width = "240px", height = "200px")),
+                                   withSpinner(plotOutput("plotOlapDist", width = "240px", height = "200px"))
+                            ), 
+                            column(width = 9,
+                                   withSpinner(DT::dataTableOutput("missedTssTable"))
+                                   
+                            ))
                     )
                 ),
                 withSpinner(htmlOutput("calcMb")),
                 downloadButton("dlFrags", label = "Download Fragments"),
-                downloadButton("dlFragsPlusSeq", label = "Download Fragments With Sequence (Slow)")
+                downloadButton("dlFragsPlusSeq", label = "Download Fragments With Sequence (Slow)"),
+                uiOutput("ucscLink")
             )
         }
     )
@@ -360,6 +394,17 @@ server <- function(input, output, session) {
     output$filterTable = DT::renderDataTable({
         DT::datatable(rvAnnotFiltering(), filter = "top", options = list(pageLength = 10, scrollX = T)) 
     }) 
+    
+    output$missedTssTable = DT::renderDataTable({
+        req(rvAnnotExt())
+        req(rvEnzSelected())
+        annot_gr = rvAnnotExt()
+        enz_gr = rvEnzSelected()
+        missed_gr = subsetByOverlaps(annot_gr, enz_gr, invert = TRUE, ignore.strand=TRUE)
+        rvAnnotMissed(missed_gr)
+        DT::datatable(as.data.frame(missed_gr), filter = "top", options = list(pageLength = 10, scrollX = T))
+    })
+    
     
     output$calcMb = renderUI({
         req(rvAnnotLock())
@@ -464,8 +509,8 @@ server <- function(input, output, session) {
         mcols(ref_gr) = NULL
         ref_gr = unique(ref_gr)
         ref_gr$id = paste0("tss_", seq_along(ref_gr))
-        end(ref_gr) = end(ref_gr) + input$numericMaxSearch
-        start(ref_gr) = start(ref_gr) - input$numericMaxSearch
+        # end(ref_gr) = end(ref_gr) + input$numericMaxSearch
+        # start(ref_gr) = start(ref_gr) - input$numericMaxSearch
         enz_gr = rvEnzLock()
         
         olaps = as.data.table(findOverlaps(ref_gr, enz_gr, ignore.strand = TRUE))
@@ -474,15 +519,17 @@ server <- function(input, output, session) {
         nc = ncol(as.data.frame(head(ref_gr)))
         colnames(olap_dt)[1:nc] = paste0("ref_", colnames(olap_dt)[1:nc])
         
-        olap_dt[, ref_start := (ref_start + input$numericMaxSearch)]
-        olap_dt[, ref_end := (ref_end - input$numericMaxSearch)]
+        # olap_dt[, ref_start := (ref_start + input$numericMaxSearch)]
+        # olap_dt[, ref_end := (ref_end - input$numericMaxSearch)]
+        # olap_dt[, ref_width := (ref_width - 2*input$numericMaxSearch)]
         olap_dt[, ref_mid := (ref_end + ref_start)/2]
         
         olap_dt[, dist := min(abs(end - ref_mid), abs(start - ref_mid)), by = 1:nrow(olap_dt)]
         olap_dt[ref_mid < end & ref_mid > start, dist := 0]
-        olap_dt[, o := order(dist, decreasing = FALSE), by = ref_id]
-        olap_dt = olap_dt[o <= input$sliderPerTSS,]
         
+        olap_dt[, o := rank(dist), by = ref_id]
+        olap_dt = olap_dt[o <= input$sliderPerTSS,]
+        rvOlapDt(olap_dt)
         enz_gr_sel = subset(enz_gr, name %in% olap_dt$name)
         rvEnzSelected(enz_gr_sel)
         
@@ -490,9 +537,43 @@ server <- function(input, output, session) {
         tab_num = as.numeric(tab)
         names(tab_num) = names(tab)
         p = ggplot() + geom_histogram(aes(x = names(tab_num), y = tab_num), stat = "identity") +
-            labs(x = "number of fragments per tss", y = "count", title = input$selectCutter)
+            labs(x = "Distance from promoter to nearest fragment", y = "count", title = input$selectCutter)
         
         p + cowplot::theme_cowplot()
+    })
+    
+    output$plotOlapDist = renderPlot({
+        req(rvAnnotExt())
+        req(rvEnzSelected())
+        annot_gr = rvAnnotExt()
+        enz_gr = rvEnzSelected()
+        dist_dt = as.data.table(distanceToNearest(annot_gr, enz_gr))
+        ggplot(dist_dt[distance < 20000], aes(x = distance)) + 
+            geom_histogram(bins = 50) + theme_cowplot()
+    })
+    
+    output$ucscLink = renderUI({
+        req(rvAnnotMissed())
+        # req(rv$trackTxt)
+        # tmpf = tempfile(pattern = "tracks_", tmpdir = CFG_DIR)
+        # write.table(rv$trackTxt, file = tmpf, quote = F, row.names = F, col.names = F)
+        tmp_url = sub(FILE_ROOT, URL_ROOT, rvConfigFile())
+        
+        ucsc_URL = "https://genome.ucsc.edu/cgi-bin/hgTracks?hgct_customText="
+        ucsc_URL = paste0(ucsc_URL, tmp_url)
+        ucsc_URL = paste0(ucsc_URL, "&guidelines=on/off")
+        if(length(rvAnnotMissed()) == 0){
+            pos = "chr21:5017493-5027492"
+        }else{
+            pos = rvAnnotMissed()[1]
+            strand(pos) = "*"
+            pos = as.character(pos)    
+        }
+        pos = paste0("&position=", sub(":", "%3A", pos))
+        ucsc_URL = paste0(ucsc_URL, pos)
+        ucsc_URL = paste0(ucsc_URL, "&hgt.reset=1")
+        ucsc_URL = paste0(ucsc_URL, "&db=", input$selectGenome)
+        tags$a(href = ucsc_URL, "to UCSC", target="_blank")
     })
     
     output$dlFrags = downloadHandler("frags.bed", 
@@ -502,21 +583,21 @@ server <- function(input, output, session) {
     )
     
     output$dlFragsPlusSeq = downloadHandler("fragsPlusSeq.bed", 
-                                     content = function(file){
-                                         library(BSgenome.Hsapiens.UCSC.hg38)
-                                         library(Biostrings)
-                                         library(data.table)
-                                         
-                                         gr = rvEnzSelected()
-                                         seq = getSeq(Hsapiens, names = gr)
-                                         gr$seq = seq
-                                         df = data.frame(gr)
-                                         # df$width = NULL
-                                         df = df[, c(1:3, 6:7, 5, 8:9)]
-                                         write.table(df, file = file, sep = "\t", row.names = F, col.names = F, quote = F)
-                                         # rtracklayer::export.bed15(gr, format = "bed", file, expNames = c("CG", "seq"))
-                                         # rtracklayer::export(gr, format = "bed", file, extraCols = c("CG" = "numeric", "seq" = "character"))
-                                     }
+                                            content = function(file){
+                                                library(BSgenome.Hsapiens.UCSC.hg38)
+                                                library(Biostrings)
+                                                library(data.table)
+                                                
+                                                gr = rvEnzSelected()
+                                                seq = getSeq(Hsapiens, names = gr)
+                                                gr$seq = seq
+                                                df = data.frame(gr)
+                                                # df$width = NULL
+                                                df = df[, c(1:3, 6:7, 5, 8:9)]
+                                                write.table(df, file = file, sep = "\t", row.names = F, col.names = F, quote = F)
+                                                # rtracklayer::export.bed15(gr, format = "bed", file, expNames = c("CG", "seq"))
+                                                # rtracklayer::export(gr, format = "bed", file, extraCols = c("CG" = "numeric", "seq" = "character"))
+                                            }
     )
 }
 
