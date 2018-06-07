@@ -113,6 +113,8 @@ ui <- fluidPage(
                        actionButton("btnLimitToVisible", "Limit To Filtered")
                 ),
                 column(width = 9,
+                       tags$h4("Use table to filter target gene set"),
+                       tags$h6("Recommend gene_type and transcript_support_level"),
                        withSpinner(DT::dataTableOutput(outputId = "filterTable"))
                 )
             )
@@ -364,15 +366,17 @@ server <- function(input, output, session) {
                                    withSpinner(plotOutput("plotOlapDist", width = "240px", height = "200px"))
                             ), 
                             column(width = 9,
+                                   tags$h4("Use table to assess genes that have been missed."),
+                                   tags$h6("Also, use the 'To UCSC' link to visualize"),
+                                   uiOutput("ucscLink"),
                                    withSpinner(DT::dataTableOutput("missedTssTable"))
-                                   
                             ))
                     )
                 ),
                 withSpinner(htmlOutput("calcMb")),
                 downloadButton("dlFrags", label = "Download Fragments"),
-                downloadButton("dlFragsPlusSeq", label = "Download Fragments With Sequence (Slow)"),
-                uiOutput("ucscLink")
+                downloadButton("dlFragsPlusSeq", label = "Download Fragments With Sequence (Slow)")
+                
             )
         }
     )
