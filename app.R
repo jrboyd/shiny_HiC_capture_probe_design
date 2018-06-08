@@ -64,7 +64,7 @@ ui <- fluidPage(
     sidebarLayout(
         sidebarPanel(
             fluidRow(
-                column(selectInput("selectGenome", "Genome", choices = "hg38"), width = 6),
+                column(selectInput("selectGenome", "Genome", choices = rev(bfcinfo(ref_bfc)$rname)), width = 6),
                 column(selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII"), selected = "HindIII"), width = 6)
                 
             ),
@@ -159,7 +159,8 @@ server <- function(input, output, session) {
             req(input$selectCutter)
             input$selectCutter
             fpath = enz_files[input$selectCutter]
-            rname = paste(input$selectGenome, input$selectCutter, sep = ",")
+            gen = sub(",.+", "", input$selectGenome)
+            rname = paste(gen, input$selectCutter, sep = ",")
             gr = readRDS(bfcrget(enz_bfc, rname))
             if(DEV){
                 gr = subset(gr, seqnames == "chr21")    
@@ -220,8 +221,8 @@ server <- function(input, output, session) {
             input$selectGenome
         }, 
         handlerExpr = {
-            # fpath = ref_files[[input$selectGenome]]
-            rname = paste(input$selectGenome, "FULL", sep = ",")
+            # rname = paste(input$selectGenome, "FULL", sep = ",")
+            rname = input$selectGenome
             gr = readRDS(bfcrget(ref_bfc, rname))
             if(DEV){
                 gr = subset(gr, seqnames == "chr21")
@@ -576,7 +577,7 @@ server <- function(input, output, session) {
         pos = paste0("&position=", sub(":", "%3A", pos))
         ucsc_URL = paste0(ucsc_URL, pos)
         ucsc_URL = paste0(ucsc_URL, "&hgt.reset=1")
-        ucsc_URL = paste0(ucsc_URL, "&db=", input$selectGenome)
+        ucsc_URL = paste0(ucsc_URL, "&db=", sub(",.+", "", input$selectGenome))
         tags$a(href = ucsc_URL, "to UCSC", target="_blank")
     })
     
