@@ -95,7 +95,7 @@ ui <- fluidPage(
                         "CG content",
                         min = 0, max = 1,
                         step = 0.01,
-                        value = c(.25, .65)),
+                        value = c(0, 1)),
             fluidRow(
                 column(withSpinner(htmlOutput("htmlTxCountFilter")),
                        withSpinner(htmlOutput("htmlFragCountFilter")), width = 4),
@@ -353,8 +353,8 @@ server <- function(input, output, session) {
                     sidebarPanel(
                         h5("TSS Extension"),
                         fluidRow(
-                            column(numericInput("numericTSSdownstream", "Downstream", value = 500, min = 0, max = 100000, step = 500), width = 6),
-                            column(numericInput("numericTSSupstream", "Upstream", value = 500, min = 0, max = 100000, step = 500), width = 6)
+                            column(numericInput("numericTSSdownstream", "Downstream", value = 5000, min = 0, max = 100000, step = 500), width = 6),
+                            column(numericInput("numericTSSupstream", "Upstream", value = 5000, min = 0, max = 100000, step = 500), width = 6)
                         ),
                         numericInput("numericMaxSearch", "Max Search Extension", value = 0, min = 0, max = 100000, step = 500),
                         hr(),
