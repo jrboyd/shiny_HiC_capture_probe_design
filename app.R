@@ -7,6 +7,7 @@
 #    http://shiny.rstudio.com/
 #
 DEV=!basename(dirname(getwd())) == "ShinyApps"
+DEV = FALSE
 library(shiny)
 library(shinycssloaders)
 library(BiocFileCache)
@@ -397,7 +398,7 @@ server <- function(input, output, session) {
     )
     
     output$filterTable = DT::renderDataTable({
-        DT::datatable(rvAnnotFiltering(), filter = "top", options = list(pageLength = 10, scrollX = T)) 
+        DT::datatable(rvAnnotFiltering(), filter = "top", options = list(pageLength = 25, scrollX = T)) 
     }) 
     
     output$missedTssTable = DT::renderDataTable({
@@ -407,7 +408,7 @@ server <- function(input, output, session) {
         enz_gr = rvEnzSelected()
         missed_gr = subsetByOverlaps(annot_gr, enz_gr, invert = TRUE, ignore.strand=TRUE)
         rvAnnotMissed(missed_gr)
-        DT::datatable(as.data.frame(missed_gr), filter = "top", options = list(pageLength = 10, scrollX = T))
+        DT::datatable(as.data.frame(missed_gr), filter = "top", options = list(pageLength = 25, scrollX = T))
     })
     
     
