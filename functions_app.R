@@ -78,6 +78,7 @@ bfcrcheck = function(x, rnam){
 }
 
 bfcrget = function(x, rnam){
+    # browser()
     q = bfcquery(x, paste0("^", rnam, "$"), field="rname")
     if(nrow(q) < 1){
         q = bfcquery(x, rnam, field="rname")
@@ -88,7 +89,8 @@ bfcrget = function(x, rnam){
     if(nrow(q) < 1){
         stop("no matches")
     }
-    paste0(bfccache(x), "/", q$rpath)
+    # paste0(bfccache(x), "/", q$rpath)
+    q$rpath
 }
 
 TEMPLATE = paste("track name=\"NAME\" description=\"DESCRIPTION\"", 

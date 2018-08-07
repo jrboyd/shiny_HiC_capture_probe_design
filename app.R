@@ -66,7 +66,7 @@ ui <- fluidPage(
         sidebarPanel(
             fluidRow(
                 column(selectInput("selectGenome", "Genome", choices = rev(bfcinfo(ref_bfc)$rname)), width = 6),
-                column(selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII"), selected = "HindIII"), width = 6)
+                column(selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII", "HindIII_PG_hist_round2"), selected = "HindIII_PG_hist_round2"), width = 6)
                 
             ),
             fluidRow(
@@ -162,6 +162,7 @@ server <- function(input, output, session) {
             fpath = enz_files[input$selectCutter]
             gen = sub(",.+", "", input$selectGenome)
             rname = paste(gen, input$selectCutter, sep = ",")
+            # browser()
             gr = readRDS(bfcrget(enz_bfc, rname))
             if(DEV){
                 gr = subset(gr, seqnames == "chr21")    
@@ -224,6 +225,7 @@ server <- function(input, output, session) {
         handlerExpr = {
             # rname = paste(input$selectGenome, "FULL", sep = ",")
             rname = input$selectGenome
+            # browser()
             gr = readRDS(bfcrget(ref_bfc, rname))
             if(DEV){
                 gr = subset(gr, seqnames == "chr21")
@@ -408,7 +410,7 @@ server <- function(input, output, session) {
         enz_gr = rvEnzSelected()
         missed_gr = subsetByOverlaps(annot_gr, enz_gr, invert = TRUE, ignore.strand=TRUE)
         rvAnnotMissed(missed_gr)
-        DT::datatable(as.data.frame(missed_gr), filter = "top", options = list(pageLength = 25, scrollX = T))
+        DT::datatable(as.data.frame(missed_gr), filter = "top", options = list(stateSave = TRUE, pageLength = 25, scrollX = T))
     })
     
     
@@ -571,6 +573,10 @@ server <- function(input, output, session) {
         if(length(rvAnnotMissed()) == 0){
             pos = "chr21:5017493-5027492"
         }else{
+            ###pos here
+            rows <<- input$missedTssTable_state
+            # message(paste(rows, collapse = ", "))
+            save.image()
             pos = rvAnnotMissed()[1]
             strand(pos) = "*"
             pos = as.character(pos)    
