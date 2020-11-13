@@ -16,7 +16,8 @@ library(data.table)
 library(ggplot2)
 library(cowplot)
 source("functions_app.R")
-ref_urls = list("hg38" = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_28/gencode.v28.annotation.gtf.gz")
+ref_urls = list("hg38" = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_28/gencode.v28.annotation.gtf.gz", 
+                "mm10" = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M25/gencode.vM25.annotation.gtf.gz")
 ref_files = list()
 raw_bfc = BiocFileCache(cache = ".cache")
 ref_bfc = BiocFileCache(cache = ".cache_ref")
@@ -38,8 +39,12 @@ if(DEV & !exists("tmp_ref")){
     tmp_ref = readRDS(bfcrget(ref_bfc, "hg38,FULL"))
     tmp_ref = subset(tmp_ref, seqnames == "chr21")
 } 
-enz_files = c("hg38,HindIII" = "~/HiC-Pro/data/frags_hg38canon_HindIII.bed",
-              "hg38,DpnII" = "~/HiC-Pro/data/frags_hg38canon_MboI.bed")
+enz_files = c(
+    "mm10,HindIII" = "~/HiC-Pro/data/frags_mm10canon_HindIII.bed",
+    "mm10,DpnII" = "~/HiC-Pro/data/frags_mm10canon_MboI.bed",
+    "hg38,HindIII" = "~/HiC-Pro/data/frags_hg38canon_HindIII.bed",
+    "hg38,DpnII" = "~/HiC-Pro/data/frags_hg38canon_MboI.bed"
+)
 
 for(i in seq_along(enz_files)){
     rname = names(enz_files)[i]
@@ -66,7 +71,7 @@ ui <- fluidPage(
         sidebarPanel(
             fluidRow(
                 column(selectInput("selectGenome", "Genome", choices = rev(bfcinfo(ref_bfc)$rname)), width = 6),
-                column(selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII", "HindIII_PG_hist_round2"), selected = "HindIII_PG_hist_round2"), width = 6)
+                column(selectInput("selectCutter", "Enzyme", choices = c("DpnII", "HindIII", "HindIII_PG_hist_round2"), selected = "HindIII"), width = 6)
                 
             ),
             fluidRow(
@@ -151,6 +156,15 @@ server <- function(input, output, session) {
     
     rvOlapDt = reactiveVal()
     
+    rvGenome = reactiveVal()
+    
+    observeEvent({
+        input$selectGenome
+    }, {
+        gen = strsplit(input$selectGenome, ",")[[1]][1]
+        rvGenome(gen)
+    })
+    
     observeEvent(
         eventExpr = {
             input$selectCutter
@@ -162,12 +176,18 @@ server <- function(input, output, session) {
             fpath = enz_files[input$selectCutter]
             gen = sub(",.+", "", input$selectGenome)
             rname = paste(gen, input$selectCutter, sep = ",")
-            # browser()
-            gr = readRDS(bfcrget(enz_bfc, rname))
-            if(DEV){
-                gr = subset(gr, seqnames == "chr21")    
+            
+            if(!rname %in% bfcinfo(enz_bfc)$rname){
+                showNotification("Unsupported genome and cutter pair", type = "error")
+                rvEnzRaw(NULL)
+            }else{
+                gr = readRDS(bfcrget(enz_bfc, rname))
+                if(DEV){
+                    gr = subset(gr, seqnames == "chr21")    
+                }
+                rvEnzRaw(gr)    
             }
-            rvEnzRaw(gr)
+            
         }
         
     )
@@ -300,12 +320,12 @@ server <- function(input, output, session) {
     #if TSS size parameter or rvAnnotFiltering change, update rvAnnotExt
     observeEvent(
         eventExpr = 
-        {
-            rvAnnotLock()
-            input$numericTSSdownstream
-            input$numericTSSupstream
-            input$numericMaxSearch
-        }, 
+            {
+                rvAnnotLock()
+                input$numericTSSdownstream
+                input$numericTSSupstream
+                input$numericMaxSearch
+            }, 
         handlerExpr = {
             if(is.null(rvAnnotLock())){
                 rvAnnotExt(rvAnnotLock())
@@ -335,7 +355,8 @@ server <- function(input, output, session) {
             annotation_full = rvAnnotRaw(), 
             annotation_filtered = rvAnnotFiltering(), 
             promoters_filtered = rvAnnotExt(),
-            promoters_missed = rvAnnotMissed()
+            promoters_missed = rvAnnotMissed(), 
+            chrSizes = ifelse(rvGenome() == "hg38", "~/hg38_chrsizes.txt", "~/mm10_chrsizes.txt")#TODO
         )
         rvConfigFile(cfg_f)
     })
@@ -481,6 +502,8 @@ server <- function(input, output, session) {
         req(input$sliderMinFragSize)
         req(input$sliderMaxFragSize)
         req(input$sliderCGrange)
+        
+        
         gr = rvEnzRaw()
         
         k = width(gr) >= input$sliderMinFragSize & width(gr) <= input$sliderMaxFragSize
@@ -498,8 +521,11 @@ server <- function(input, output, session) {
             geom_histogram(bins = 100) +
             coord_cartesian(xlim = c(0, max(df$width)))
         bp = ggplot2::ggplot_build(p)
+        
         xrng = bp$layout$panel_ranges[[1]]$x.range
         yrng = bp$layout$panel_ranges[[1]]$y.range
+        if(is.null(xrng)) xrng = bp$layout$panel_params[[1]]$x.range
+        if(is.null(yrng)) yrng = bp$layout$panel_params[[1]]$y.range
         p + annotate("text", 
                      x = mean(xrng), 
                      y = mean(yrng), 
@@ -596,12 +622,22 @@ server <- function(input, output, session) {
     
     output$dlFragsPlusSeq = downloadHandler("fragsPlusSeq.bed", 
                                             content = function(file){
-                                                library(BSgenome.Hsapiens.UCSC.hg38)
+                                                
+                                                
                                                 library(Biostrings)
                                                 library(data.table)
                                                 
                                                 gr = rvEnzSelected()
-                                                seq = getSeq(Hsapiens, names = gr)
+                                                if(rvGenome() == "hg38"){
+                                                    library(BSgenome.Hsapiens.UCSC.hg38)
+                                                    seq = getSeq(Hsapiens, names = gr)    
+                                                }else if(rvGenome() == "mm10"){
+                                                    library(BSgenome.Mmusculus.UCSC.mm10)    
+                                                    seq = getSeq(Mmusculus, names = gr)   
+                                                }else{
+                                                    showNotification("problem", type = "error")
+                                                }
+                                                
                                                 gr$seq = seq
                                                 df = data.frame(gr)
                                                 # df$width = NULL

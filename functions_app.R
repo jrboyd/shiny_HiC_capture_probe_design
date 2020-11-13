@@ -7,6 +7,7 @@ ucsc_probe_tracks = function(enzyme,
                              promoters_filtered,
                              promoters_missed,
                              out_dir = "/slipstream/galaxy/production/galaxy-dist/static/UCSCtracks/joeboyd_files/probe_app/",
+                             chrSizes = "~/hg38_chrsizes.txt",
                              cfg_f = paste0(out_dir, "track_config_probe_design.txt"),
                              uid = round(runif(1)*10^6)
 ){
@@ -15,7 +16,7 @@ ucsc_probe_tracks = function(enzyme,
         colrgb = paste(col2rgb(color)[,1], collapse = ",")
         rtracklayer::export.bed(gr, bedf)
         system(paste("bedSort", bedf, paste0(bedf, ".sorted")), intern = TRUE)
-        system(paste("bedToBigBed", paste0(bedf, ".sorted"), "~/hg38_chrsizes.txt", bbf), intern = TRUE)
+        system(paste("bedToBigBed", paste0(bedf, ".sorted"), chrSizes, bbf), intern = TRUE)
         makeTrack(file = bbf, type = "bigBed", name = desc, description = desc, color = colrgb)
     }
     
@@ -46,7 +47,7 @@ ucsc_probe_tracks = function(enzyme,
         promoters_missed = sortSeqlevels(GRanges(promoters_missed))
         promoters_missed = sort(promoters_missed)
     }else{
-        promoters_missed = GRanges("chr21", IRanges(1, 2))
+        promoters_missed = GRanges("chr1", IRanges(1, 2))
     }
     
     
